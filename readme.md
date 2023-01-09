@@ -1,0 +1,2 @@
+- `pip install -r requirements.txt`
+- extract the DB `tar -xzvf PREDICTIONS.db.tar.gz`

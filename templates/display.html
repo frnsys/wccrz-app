@@ -1,0 +1,464 @@
+<html>
+
+<head>
+  <title>White Collar Crime Risk Zones</title>
+  <link rel="icon" href="/static/img/favicon.png?v=1.0">
+
+  <script src='https://api.mapbox.com/mapbox.js/v3.1.0/mapbox.js'></script>
+  <link href='https://api.mapbox.com/mapbox.js/v3.1.0/mapbox.css' rel='stylesheet' />
+
+  <script src="/static/js/latlon-geohash.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+
+  <!-- <script src='https://api.mapbox.com/mapbox&#45;gl&#45;js/v0.37.0/mapbox&#45;gl.js'></script> -->
+  <!-- <link href='https://api.mapbox.com/mapbox&#45;gl&#45;js/v0.37.0/mapbox&#45;gl.css' rel='stylesheet' /> -->
+
+
+  <style>
+    body {
+      font-family: helvetica, sans-serif;
+      color: #fff;
+    }
+    body,
+    html,
+    #map,
+    #app {
+      /* width: 1280px; */
+      /* height: 720px; */
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+    #map {
+      position: absolute;
+      z-index: 0;
+    }
+    video {
+      z-index: 999;
+        position: relative;
+      /* display: none !Important; */
+      /* position: absolute; */
+      /* left: 50%; */
+      /* top: 50%; */
+      /* margin-left: -250px; */
+      /* margin-top: -300px; */
+      /* transform: scale(.3); */
+    }
+    #details {
+      flex: 1;
+      display: flex;
+      z-index: 1;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      position: absolute;
+      width: 100%;
+      height: 100%;
+        z-index: 999;
+    }
+    #app {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    .mapboxgl-ctrl-bottom-right,
+    .mapboxgl-ctrl-logo, .leaflet-control-attribution {
+      display: none !important;
+    }
+    @-webkit-keyframes blinker {
+      from {opacity: 1.0;}
+      to {opacity: 0.0;}
+    }
+    #crime-rate {
+      position: fixed;
+      width: 100%;
+      top: 0;
+      left: 0;
+      z-index: 999;
+      text-align: center;
+      background-color: red;
+      color: #fff;
+      font-weight: bold;
+      text-decoration: blink;
+      -webkit-animation-name: blinker;
+      -webkit-animation-duration: 0.3s;
+      -webkit-animation-iteration-count:infinite;
+      -webkit-animation-timing-function:ease-in-out;
+      -webkit-animation-direction: alternate;
+    }
+    .org, .crime {
+      position: absolute;
+      z-index: 3;
+      background-color: rgba(0, 0, 0, .5);
+    }
+  </style>
+
+</head>
+
+<body>
+
+  <div id="app">
+    <div id="crime-rate"></div>
+    <div id="details">
+      <!-- <h1 id="suspect&#45;header">MOST LIKELY SUSPECT</h1> -->
+      <video autoplay loop></video>
+    </div>
+    <div id="map"></div>
+  </div>
+
+  <script>
+    // if ('serviceWorker' in navigator) {
+     //   window.addEventListener('load', function() {
+     //     navigator.serviceWorker.register('/sw.js').then(function(registration) {
+     //       console.log('ServiceWorker registration successful with scope: ', registration.scope);
+     //     }, function(err) {
+     //       console.log('ServiceWorker registration failed: ', err);
+     //     });
+     //   });
+     // }
+
+    var data;
+    var vid = $('video');
+    var index = 0;
+
+    var crimes = [
+      'BREACH OF FIDUCIARY DUTY',
+      'CHURNING',
+      'FRAUD',
+      'MANIPULATION',
+      'MISREPRESENTATION',
+      'OMISSION OF FACTS',
+      'SUITABILITY',
+      'UNAUTHORIZED TRADING',
+      'BREACH OF CONTRACT',
+      'ACCOUNT RELATED - COLLECTION',
+      'ACCOUNT RELATED - DIVIDENDS',
+      'ACCOUNT RELATED - ERROR CHARGE',
+      'ACCOUNT RELATED - EXCHANGE',
+      'FAILURE TO SUPERVISE',
+      'MARGIN CALL',
+      'NEGLIGENCE',
+      'ACCOUNT RELATED-TRANSFER',
+      'EMPLOYMENT DISCRIMINATION BASED ON AGE',
+      'EXECUTIONS-EXECUTION PRICE',
+      'FAILURE TO EXECUTE',
+      'EXECUTIONS-LIMIT V MRKT ORDR',
+      'FAILURE OF DUE DILIGENCE',
+      'FAILURE TO PAY',
+      'FAILURE TO REPORT OR INCORRECT REPORTING',
+      'FAILURE TO RESPOND TO FINRA',
+      'IMPROPER CHARGE',
+      'INACCURATE DATA',
+      'INCORRECT MARK',
+      'OPERATING WITHOUT LICENSE OR IMPROPER LICENSE',
+      'OTHER',
+      'DEFAMATION',
+      'RULE VIOLATION',
+      'BUY IN TRADING DISPUTE',
+      'MANIPULATION TRADING DISPUTE',
+      'MARK UP TRADING DISPUTE',
+      'TRANSFER TRADING DISPUTE',
+      'UNETHICAL BUSINESS PRACTICES'
+    ];
+
+
+
+    // mapboxgl.accessToken = 'pk.eyJ1IjoiYmNsaWZ0b24iLCJhIjoicWNXT0Z6OCJ9.JvNO6GIbU8BZ-8LLSEwz2Q';
+    //
+    // var map = new mapboxgl.Map({
+    //   container: 'map',
+    //   style: 'mapbox://styles/bclifton/cj0h8ywzx000i2spmjpb1zmy7',
+    //   center: [0, 0],
+    //   zoom: 1,
+    // });
+
+    L.mapbox.accessToken = 'pk.eyJ1IjoiYmNsaWZ0b24iLCJhIjoicWNXT0Z6OCJ9.JvNO6GIbU8BZ-8LLSEwz2Q';
+    // var map = L.mapbox.map('map', {
+    //   center: [0, 0],
+    //   zoom: 1, zoomControl: false
+    // });
+    var map = L.mapbox.map('map', '', {zoomControl: false}).setView([0, 0], 1);
+
+    // Use styleLayer to add a Mapbox style created in Mapbox Studio
+    L.mapbox.styleLayer('mapbox://styles/bclifton/cj0h8ywzx000i2spmjpb1zmy7').addTo(map);
+
+    function chopAnimateCoord(lng, lat, steps, interval) {
+      return new Promise(function(resolve, reject) {
+        var current = map.getCenter();
+        var currentLng = current.lng;
+        var currentLat = current.lat;
+
+        var deltaLng = (lng - currentLng) / steps;
+        var deltaLat = (lat - currentLat) / steps;
+
+        var stepsTaken = 0;
+
+        function animate() {
+          setTimeout(function() {
+            currentLng += deltaLng;
+            currentLat += deltaLat;
+
+            console.log(currentLat, currentLng);
+
+            map.setCenter([currentLng, currentLat])
+            stepsTaken++;
+
+            if (stepsTaken < steps) animate();
+            else resolve();
+          }, interval);
+        }
+        animate();
+      });
+    }
+
+    function chopAnimate(prop, target, steps, interval) {
+      return new Promise(function(resolve, reject) {
+        var current = map[`get${prop}`]();
+        var delta = (target - current) / steps;
+        var stepsTaken = 0;
+
+        function animate() {
+          setTimeout(function() {
+            current += delta;
+            map[`set${prop}`](current)
+            stepsTaken++;
+
+            if (stepsTaken < steps) animate();
+            else resolve();
+          }, interval);
+        }
+        animate();
+      });
+    }
+
+    function choice(items) {
+      return items[Math.floor(Math.random() * items.length)];
+    }
+
+     // function choice(items) {
+     //   var item = items[index];
+     //   index++;
+     //   if (index > items.length - 1) index = 0;
+     //   return item;
+     // }
+    function showOrg(o, i, total) {
+      o = o[0];
+      var spacing = ($('#app').height())/total;
+      var org = $(`<div class="org h">HIGH ALERT FOR: <b>${o}</b></div>`);
+      // org.css({top: Math.random() * window.innerWidth, left: Math.random() * window.innerHeight, fontSize: Math.random()*10+18});
+      org.hide();
+      $('#app').append(org);
+      setTimeout(function() {
+        org.show().css({top: window.innerHeight + 300, left: org.width()*-2, fontSize: Math.random()*5+15});
+        org.animate({top: i*spacing, left: Math.random()*10}, 2000)
+      }, i*500)
+    }
+
+    function showTop(t, i, total) {
+      t = crimes[t.i];
+      var spacing = ($('#app').height()-200)/total;
+      var c = $(`<div class="crime h">PREDICTED INFRACTION: <b>${t}</b></div>`);
+      c.hide();
+      // c.css({top: Math.random() * window.innerWidth, left: Math.random() * window.innerHeight, fontSize: Math.random()*10+18});
+      $('#app').append(c);
+      setTimeout(function() {
+        c.show();
+        c.css({top: window.innerHeight + 300, right: c.width()*-2, fontSize: Math.random()*5+15});
+        c.animate({top: i*spacing+100, right: Math.random()*10}, 2000);
+      }, i*800)
+    }
+
+    function showDetails(geohash) {
+      $.getJSON('/api/details', {
+        geohash: geohash
+      }, function(details) {
+        $('#crime-rate').html(`WHITE COLLAR CRIME LIKELIHOOD: <b>${Math.floor(details.crime*100)}%</b>`).show();
+        details.organizations.forEach(function(o, i){showOrg(o, i, details.organizations.length)})
+        details.top.forEach(function(o, i){showTop(o, i, details.top.length)})
+      });
+    }
+
+
+    function goRandom() {
+      var item = choice(data);
+      var coords = Geohash.decode(item[0]);
+      var bbox = Geohash.bounds(item[0]);
+      var url = item[1].replace('.png', '.webm').replace('http://', 'https://');
+      $('#suspect-header, #crime-rate').hide();
+      $('.org, .crime').remove();
+      vid.fadeOut(function() {
+        vid.css({
+          width: 0
+        });
+      });
+
+      // vid.addClass('trans');
+      // map.flyTo({
+      //   center: [coords.lon, coords.lat],
+      //   zoom: 18,
+      //   curve: 1.5,
+      //   speed: .8,
+      //   // duration: 5000,
+      //   pitch: Math.random()*180,
+      //   bearing: Math.random()*180,
+      // });
+      // map.once('moveend', function() {
+      //   $('video').attr('src', url).fadeIn();
+      //   setTimeout(goRandom, 3000);
+      // });
+
+      // chopAnimateCoord(coords.lon, coords.lat, 10, 100).then(function(){
+      //   vid.attr('src', url).fadeIn();
+      //
+      //   setTimeout(function() {
+      //     vid.animate({
+      //       width: 800
+      //     }, 4000);
+      //   }, 100);
+      //   chopAnimate('Pitch', Math.random()*180, 20, 200);
+      //   chopAnimate('Bearing', Math.random()*180, 20, 200);
+      //   return chopAnimate('Zoom', 18, 20, 200);
+      // }).then(function(){
+      //   return new Promise(function(resolve, reject){
+      //     setTimeout(function(){ resolve()}, 4000);
+      //   });
+      // }).then(function(){
+      //   vid.fadeOut();
+      //   return chopAnimate('Zoom', 12, 5, 150);
+      // }).then(function(){
+      //   goRandom();
+      // });
+
+      // map.jumpTo({
+      //   center: [coords.lon, coords.lat],
+      //   zoom: 14,
+      //   pitch: 0,
+      //   bearing: 0,
+      // });
+      //
+      // setTimeout(function(){
+      //   vid.attr('src', url).fadeIn();
+      //
+      //   setTimeout(function() {
+      //     vid.animate({
+      //       width: 800
+      //     }, 4000);
+      //   }, 100);
+      //
+      //   setTimeout(function(){
+      //     map.jumpTo({
+      //       center: [coords.lon, coords.lat],
+      //       zoom: 18,
+      //       pitch: Math.random() * 180,
+      //       bearing: Math.random() * 180,
+      //     });
+      //     setTimeout(goRandom, 4000);
+      //   }, 2000)
+      //
+      // }, 500);
+
+
+
+      // map.jumpTo({
+      //   center: [coords.lon, coords.lat],
+      //   zoom: 10,
+      //   pitch: 0,
+      //   bearing: 0,
+      // });
+      // map.flyTo({
+      //   center: [coords.lon, coords.lat],
+      //   zoom: 10,
+      //   duration: 25000,
+      //   pitch: 0,
+      //   bearing: 0,
+      // });
+      // map.once('moveend', function() {
+      //   vid.attr('src', url).fadeIn();
+      //   setTimeout(function() {
+      //     $('#suspect-header').fadeIn();
+      //     showDetails(item[0]);
+      //   }, 5000);
+      //
+      //   setTimeout(function() {
+      //     vid.animate({
+      //       width: 600
+      //     }, 14000);
+      //   }, 1000);
+      //
+      //   map.easeTo({
+      //     center: [coords.lon, coords.lat],
+      //     zoom: 18,
+      //     duration: 25000,
+      //     pitch: Math.random() * 180,
+      //     bearing: Math.random() * 180,
+      //   });
+      //   map.once('moveend', function() {
+      //     setTimeout(goRandom, 4000);
+      //   });
+      // });
+      console.log(coords);
+      var dur = 15;
+      map.flyTo({lon: coords.lon, lat: coords.lat}, 10, {duration: dur});
+
+      map.once('moveend', function() {
+        vid.attr('src', url).fadeIn();
+        setTimeout(function() {
+          $('#suspect-header').fadeIn();
+          showDetails(item[0]);
+        }, 5000);
+
+        setTimeout(function() {
+          vid.animate({
+            width: 600
+          }, 18000);
+        }, 5000);
+
+        map.flyTo({lon: coords.lon, lat: coords.lat}, 18, {duration: dur});
+        map.once('moveend', function() {
+          setTimeout(goRandom, 6000);
+        });
+      });
+
+
+
+      // map.zoomTo(12, {duration: 3});
+      // map.once('moveend', function() {
+      //   map.panTo([coords.lon, coords.lat], {
+      //     duration: 10000,
+      //   });
+      //   map.once('moveend', function() {
+      //     vid.attr('src', url).fadeIn();
+      //
+      //     setTimeout(function() {
+      //       vid.animate({
+      //         width: 800
+      //       }, 4000);
+      //     }, 6000);
+      //
+      //     map.easeTo({
+      //       center: [coords.lon, coords.lat],
+      //       zoom: 18,
+      //       duration: 10000,
+      //       // pitch: Math.random() * 180,
+      //       // bearing: Math.random() * 180,
+      //     });
+      //     map.once('moveend', function() {
+      //       setTimeout(goRandom, 4000);
+      //     });
+      //   });
+      // });
+    };
+
+    $.getJSON('/api/allsuspects', function(_data) {
+      data = _data.sort(function(a, b) {
+        return a[0].localeCompare(b[0]);
+      });
+      goRandom();
+    });
+  </script>
+
+</body>
+
+</html>
